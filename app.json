@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "VoiceVault",
+    "slug": "voice-vault",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "voicevault",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "VoiceVault requires access to the microphone to record your voice notes."
+      }
+    },
+    "android": {
+      "package": "com.voicevault.app",
+      "permissions": [
+        "RECORD_AUDIO",
+        "INTERNET",
+        "MODIFY_AUDIO_SETTINGS",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ],
+      "adaptiveIcon": {
+        "backgroundColor": "#0F172A",
+        "foregroundImage": "./assets/android-icon-foreground.png"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-sharing",
+      "expo-web-browser",
+      [
+        "expo-av",
+        {
+          "microphonePermission": "VoiceVault needs access to your microphone to record audio notes."
+        }
+      ]
+    ]
+  }
+}
