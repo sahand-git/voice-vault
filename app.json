@@ -4,6 +4,7 @@
     "slug": "voice-vault",
     "version": "1.0.0",
     "orientation": "portrait",
+    "newArchEnabled": false,
     "scheme": "voicevault",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -38,7 +39,9 @@
         {
           "microphonePermission": "VoiceVault needs access to your microphone to record audio notes."
         }
-      ]
+      ],
+      "expo-font",
+      "expo-system-ui"
     ]
   }
 }

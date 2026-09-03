@@ -5,7 +5,11 @@ import * as AuthSession from 'expo-auth-session';
 import { GoogleDriveUser, RecordingItem } from '../types';
 import { getSettings, saveSettings, updateRecording } from './storageService';
 
-WebBrowser.maybeCompleteAuthSession();
+try {
+  WebBrowser.maybeCompleteAuthSession();
+} catch (e) {
+  // Ignored on standalone launch
+}
 
 // Google OAuth configuration
 // Scopes: drive.file grants access only to files created or opened by VoiceVault

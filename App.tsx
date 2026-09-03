@@ -7,13 +7,16 @@ import {
   TouchableOpacity,
   Platform,
   StatusBar as RNStatusBar,
+  ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import * as Font from 'expo-font';
 import { Ionicons } from '@expo/vector-icons';
 import { RecordScreen } from './src/screens/RecordScreen';
 import { LibraryScreen } from './src/screens/LibraryScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { AudioPlayerBottomBar } from './src/components/AudioPlayerBottomBar';
+import { ErrorBoundary } from './src/components/ErrorBoundary';
 import {
   getRecordings,
   getSettings,
@@ -28,7 +31,8 @@ import {
 } from './src/services/audioService';
 import { RecordingItem, AppSettings } from './src/types';
 
-export default function App() {
+function MainApp() {
+  const [isReady, setIsReady] = useState(false);
   const [activeTab, setActiveTab] = useState<'record' | 'library' | 'settings'>('record');
   const [recordings, setRecordings] = useState<RecordingItem[]>([]);
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -40,27 +44,64 @@ export default function App() {
   const [playbackDuration, setPlaybackDuration] = useState(0);
 
   useEffect(() => {
-    initApp();
+    let isMounted = true;
+
+    async function prepare() {
+      try {
+        // Load vector icon fonts safely
+        try {
+          await Font.loadAsync(Ionicons.font);
+        } catch (fontErr) {
+          console.warn('Non-fatal font load warning:', fontErr);
+        }
+
+        // Initialize directories safely
+        try {
+          await ensureDirectoryExists();
+        } catch (dirErr) {
+          console.warn('Directory check error:', dirErr);
+        }
+
+        // Configure audio
+        try {
+          await configureAudioSession();
+        } catch (audioErr) {
+          console.warn('Audio session error:', audioErr);
+        }
+
+        // Load saved state
+        try {
+          const list = await getRecordings();
+          if (isMounted) setRecordings(list);
+          const s = await getSettings();
+          if (isMounted) setSettings(s);
+        } catch (dataErr) {
+          console.warn('Data load error:', dataErr);
+        }
+      } finally {
+        if (isMounted) {
+          setIsReady(true);
+        }
+      }
+    }
+
+    prepare();
+
     return () => {
-      stopSound();
+      isMounted = false;
+      stopSound().catch(() => {});
     };
   }, []);
 
-  const initApp = async () => {
-    try {
-      await ensureDirectoryExists();
-      await configureAudioSession();
-      await refreshData();
-    } catch (e) {
-      console.warn('App initialization error:', e);
-    }
-  };
-
   const refreshData = async () => {
-    const list = await getRecordings();
-    setRecordings(list);
-    const s = await getSettings();
-    setSettings(s);
+    try {
+      const list = await getRecordings();
+      setRecordings(list);
+      const s = await getSettings();
+      setSettings(s);
+    } catch (e) {
+      console.warn('Error refreshing data:', e);
+    }
   };
 
   // Playback handlers
@@ -72,10 +113,10 @@ export default function App() {
       setPlaybackDuration(item.durationMs);
 
       await playSound(item.uri, (status: any) => {
-        if (status.isLoaded) {
-          setPlaybackPosition(status.positionMillis);
+        if (status && status.isLoaded) {
+          setPlaybackPosition(status.positionMillis || 0);
           setPlaybackDuration(status.durationMillis || item.durationMs);
-          setIsPlaying(status.isPlaying);
+          setIsPlaying(Boolean(status.isPlaying));
           if (status.didJustFinish) {
             setIsPlaying(false);
             setPlaybackPosition(0);
@@ -103,6 +144,16 @@ export default function App() {
     setCurrentPlayingItem(null);
     setIsPlaying(false);
   };
+
+  if (!isReady) {
+    return (
+      <View style={styles.splashContainer}>
+        <StatusBar style="light" />
+        <ActivityIndicator size="large" color="#10B981" />
+        <Text style={styles.splashText}>Starting VoiceVault...</Text>
+      </View>
+    );
+  }
 
   const unsyncedCount = recordings.filter((r) => !r.isSynced).length;
 
@@ -254,7 +305,27 @@ export default function App() {
   );
 }
 
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <MainApp />
+    </ErrorBoundary>
+  );
+}
+
 const styles = StyleSheet.create({
+  splashContainer: {
+    flex: 1,
+    backgroundColor: '#0F172A',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+  },
+  splashText: {
+    color: '#94A3B8',
+    fontSize: 14,
+    fontWeight: '600',
+  },
   safeArea: {
     flex: 1,
     backgroundColor: '#0F172A',

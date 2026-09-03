@@ -5,6 +5,9 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build VoiceVault APK
@@ -35,15 +38,45 @@ jobs:
       - name: Generate Android Native Project
         run: npx expo prebuild --platform android --clean
 
-      - name: Build Android APK
+      - name: Build Android APKs (Debug & Release)
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon
+          ./gradlew assembleDebug assembleRelease --no-daemon
+
+      - name: Prepare APK Files
+        run: |
+          mkdir -p build-apks
+          find android/app/build/outputs/apk/debug -name "*.apk" -exec cp {} build-apks/VoiceVault-Debug.apk \;
+          find android/app/build/outputs/apk/release -name "*.apk" -exec cp {} build-apks/VoiceVault-Release.apk \;
+          ls -la build-apks/
 
       - name: Upload VoiceVault APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: VoiceVault-Android-APK
-          path: android/app/build/outputs/apk/release/*.apk
+          name: VoiceVault-Android-APKs
+          path: build-apks/*.apk
           retention-days: 30
+
+      - name: Publish to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main'
+        with:
+          tag_name: v1.0.0
+          name: "VoiceVault v1.0.0 (Android APK)"
+          body: |
+            ## VoiceVault v1.0.0 for Android 🎙️☁️
+
+            Direct download links for your phone:
+            - **[Download VoiceVault.apk (Recommended)](https://github.com/sahand-git/voice-vault/releases/download/v1.0.0/VoiceVault-Debug.apk)**
+            - **[Download VoiceVault-Release.apk](https://github.com/sahand-git/voice-vault/releases/download/v1.0.0/VoiceVault-Release.apk)**
+
+            ### How to Install on Your Phone:
+            1. Tap either download link above directly on your Android phone.
+            2. When the download finishes, open the `.apk` from your notifications or Downloads folder.
+            3. Tap **Install** (if prompted, allow installs from your browser).
+          files: |
+            build-apks/VoiceVault-Debug.apk
+            build-apks/VoiceVault-Release.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
