@@ -1,0 +1,4 @@
+<resources>
+  <string name="app_name">VoiceVault</string>
+  <string name="accessibility_service_description">VoiceVault Call Detection Service monitors WhatsApp and VoIP call events to automatically launch voice recording and cloud sync.</string>
+</resources>

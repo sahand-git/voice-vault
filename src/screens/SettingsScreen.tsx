@@ -13,6 +13,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { AppSettings, GoogleDriveUser } from '../types';
 import { getSettings, saveSettings, setGoogleUser } from '../services/storageService';
 import { fetchGoogleProfile } from '../services/driveService';
+import {
+  isAccessibilityEnabled,
+  openAccessibilitySettings,
+  isNotificationAccessEnabled,
+  openNotificationSettings,
+  isBatteryOptimizationIgnored,
+  requestIgnoreBatteryOptimization,
+} from '../services/callDetectionService';
 
 interface Props {
   onSettingsChanged?: () => void;
@@ -23,10 +31,23 @@ export const SettingsScreen: React.FC<Props> = ({ onSettingsChanged }) => {
   const [showTokenInput, setShowTokenInput] = useState(false);
   const [inputToken, setInputToken] = useState('');
   const [folderName, setFolderName] = useState('VoiceVault Recordings');
+  const [accessibilityOk, setAccessibilityOk] = useState(false);
+  const [notifAccessOk, setNotifAccessOk] = useState(false);
+  const [batteryOk, setBatteryOk] = useState(false);
 
   useEffect(() => {
     loadCurrentSettings();
+    checkNativePermissions();
   }, []);
+
+  const checkNativePermissions = async () => {
+    const a = await isAccessibilityEnabled();
+    const n = await isNotificationAccessEnabled();
+    const b = await isBatteryOptimizationIgnored();
+    setAccessibilityOk(a);
+    setNotifAccessOk(n);
+    setBatteryOk(b);
+  };
 
   const loadCurrentSettings = async () => {
     const s = await getSettings();
@@ -95,6 +116,100 @@ export const SettingsScreen: React.FC<Props> = ({ onSettingsChanged }) => {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      {/* WhatsApp Call Auto-Recorder Setup */}
+      <View style={[styles.sectionCard, styles.autoCallCard]}>
+        <View style={styles.sectionHeader}>
+          <Ionicons name="call" size={20} color="#10B981" />
+          <Text style={styles.sectionTitle}>WhatsApp & Call Auto-Recorder</Text>
+        </View>
+
+        <Text style={styles.autoCallDesc}>
+          Automatically detects incoming and outgoing WhatsApp & VoIP calls, wakes up VoiceVault, and records the conversation in the background.
+        </Text>
+
+        <View style={styles.permissionList}>
+          {/* 1. Accessibility */}
+          <View style={styles.permissionRow}>
+            <View style={styles.permissionTextCol}>
+              <Text style={styles.permissionName}>1. Call Screen Detection</Text>
+              <Text style={styles.permissionSub}>Monitors when WhatsApp call window opens</Text>
+            </View>
+            {accessibilityOk ? (
+              <View style={styles.grantedBadge}>
+                <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+                <Text style={styles.grantedText}>Active</Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.grantButton}
+                onPress={() => {
+                  openAccessibilitySettings();
+                  setTimeout(checkNativePermissions, 2000);
+                }}
+              >
+                <Text style={styles.grantBtnText}>Turn ON</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* 2. Notification Access */}
+          <View style={styles.permissionRow}>
+            <View style={styles.permissionTextCol}>
+              <Text style={styles.permissionName}>2. Incoming Call Listener</Text>
+              <Text style={styles.permissionSub}>Wakes recorder when WhatsApp rings</Text>
+            </View>
+            {notifAccessOk ? (
+              <View style={styles.grantedBadge}>
+                <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+                <Text style={styles.grantedText}>Active</Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.grantButton}
+                onPress={() => {
+                  openNotificationSettings();
+                  setTimeout(checkNativePermissions, 2000);
+                }}
+              >
+                <Text style={styles.grantBtnText}>Turn ON</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* 3. Battery Optimization */}
+          <View style={styles.permissionRow}>
+            <View style={styles.permissionTextCol}>
+              <Text style={styles.permissionName}>3. Background Protection</Text>
+              <Text style={styles.permissionSub}>Prevents Android from killing recording</Text>
+            </View>
+            {batteryOk ? (
+              <View style={styles.grantedBadge}>
+                <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+                <Text style={styles.grantedText}>Active</Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.grantButton}
+                onPress={() => {
+                  requestIgnoreBatteryOptimization();
+                  setTimeout(checkNativePermissions, 2000);
+                }}
+              >
+                <Text style={styles.grantBtnText}>Allow</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        <TouchableOpacity
+          style={styles.refreshPermissionsBtn}
+          onPress={checkNativePermissions}
+        >
+          <Ionicons name="refresh" size={14} color="#94A3B8" />
+          <Text style={styles.refreshPermissionsText}>Refresh Status</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Cloud Account Section */}
       <View style={styles.sectionCard}>
         <View style={styles.sectionHeader}>
@@ -467,6 +582,83 @@ const styles = StyleSheet.create({
   specVal: {
     color: '#F8FAFC',
     fontSize: 13,
+    fontWeight: '600',
+  },
+  autoCallCard: {
+    borderLeftWidth: 4,
+    borderLeftColor: '#10B981',
+  },
+  autoCallDesc: {
+    fontSize: 12,
+    color: '#94A3B8',
+    lineHeight: 18,
+    marginBottom: 14,
+  },
+  permissionList: {
+    gap: 12,
+    marginBottom: 14,
+  },
+  permissionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#0F172A',
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  permissionTextCol: {
+    flex: 1,
+    marginRight: 10,
+  },
+  permissionName: {
+    color: '#F8FAFC',
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  permissionSub: {
+    color: '#64748B',
+    fontSize: 11,
+  },
+  grantedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  grantedText: {
+    color: '#10B981',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  grantButton: {
+    backgroundColor: '#10B981',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  grantBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  refreshPermissionsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+  },
+  refreshPermissionsText: {
+    color: '#94A3B8',
+    fontSize: 12,
     fontWeight: '600',
   },
 });

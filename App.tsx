@@ -21,7 +21,11 @@ import {
   getRecordings,
   getSettings,
   ensureDirectoryExists,
+  saveRecording,
 } from './src/services/storageService';
+import { uploadRecordingToDrive } from './src/services/driveService';
+import * as FileSystem from 'expo-file-system';
+import { subscribeToCallRecordings, CallRecordingEvent } from './src/services/callDetectionService';
 import {
   configureAudioSession,
   playSound,
@@ -87,9 +91,40 @@ function MainApp() {
 
     prepare();
 
+    const unsubscribeCalls = subscribeToCallRecordings(async (event: CallRecordingEvent) => {
+      if (!event.active && event.filePath) {
+        try {
+          const fileInfo = await FileSystem.getInfoAsync(event.filePath);
+          if (fileInfo.exists) {
+            const timestamp = event.timestamp || Date.now();
+            const newItem: RecordingItem = {
+              id: `call_${timestamp}_${Math.random().toString(36).substring(2, 6)}`,
+              title: `WhatsApp Call ${new Date(timestamp).toLocaleDateString()} ${new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+              uri: event.filePath,
+              durationMs: 0,
+              sizeBytes: fileInfo.size || 0,
+              createdAt: timestamp,
+              isSynced: false,
+            };
+            await saveRecording(newItem);
+            await refreshData();
+
+            // Auto-backup to Google Drive if configured
+            const s = await getSettings();
+            if (s.autoBackup && s.googleUser?.accessToken) {
+              uploadRecordingToDrive(newItem, s.googleUser.accessToken).catch(() => {});
+            }
+          }
+        } catch (callErr) {
+          console.warn('Call recording processing error:', callErr);
+        }
+      }
+    });
+
     return () => {
       isMounted = false;
       stopSound().catch(() => {});
+      unsubscribeCalls();
     };
   }, []);
 
