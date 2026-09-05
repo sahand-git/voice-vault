@@ -59,19 +59,19 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.3.0
-          name: "VoiceVault v1.3.0 (Native JSI Fixed - Modern Audio Engine)"
+          tag_name: v1.3.1
+          name: "VoiceVault v1.3.1 (Standalone Offline Bundled)"
           body: |
-            ## VoiceVault v1.3.0 for Android 🎙️📞☁️
+            ## VoiceVault v1.3.1 for Android 🎙️📞☁️
 
-            ### 🚀 What's Fixed in v1.3.0:
-            - **Eliminated `libexpo-av.so` UnsatisfiedLinkError**: Replaced deprecated `expo-av` with the official modern `expo-audio` engine (which uses standard AndroidX Media3 / ExoPlayer without legacy C++ JSI mismatches).
-            - **No More Auto-Close / JSI Crashes**: Full compatibility with React Native runtime.
-            - **Native WhatsApp Call Auto-Recorder**: Background Accessibility and Notification detection intact.
+            ### 🚀 What's Fixed in v1.3.1:
+            - **Fixed "Unable to load script" (index.android.bundle)**: Configured `debuggableVariants = []` so that the complete JavaScript bundle is compiled and packaged directly into the APK assets. The app now runs completely offline on your phone without needing Metro or a computer connection.
+            - **Modern Audio Engine (expo-audio)**: Zero native JSI linking errors, rock-solid Android 14+ compatibility.
+            - **Native WhatsApp Call Auto-Recorder**: Accessibility Service + Foreground Service.
 
             ### 📱 Direct Download Links for Your Phone:
-            - **[Download VoiceVault-Debug.apk (Recommended)](https://github.com/sahand-git/voice-vault/releases/download/v1.3.0/VoiceVault-Debug.apk)**
-            - **[Download VoiceVault-Release.apk](https://github.com/sahand-git/voice-vault/releases/download/v1.3.0/VoiceVault-Release.apk)**
+            - **[Download VoiceVault-Debug.apk (Recommended)](https://github.com/sahand-git/voice-vault/releases/download/v1.3.1/VoiceVault-Debug.apk)**
+            - **[Download VoiceVault-Release.apk](https://github.com/sahand-git/voice-vault/releases/download/v1.3.1/VoiceVault-Release.apk)**
 
             ### ⚙️ How to Activate WhatsApp Auto-Recording:
             1. Install and open VoiceVault.
