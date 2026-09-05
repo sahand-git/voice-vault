@@ -35,20 +35,41 @@ class CallRecorderModule(private val reactContext: ReactApplicationContext) :
                     putDouble("timestamp", timestamp.toDouble())
                 }
 
-                reactContext
-                    .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
-                    .emit("onCallRecordingStateChanged", params)
+                try {
+                    if (reactContext.hasActiveReactInstance()) {
+                        reactContext
+                            .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+                            ?.emit("onCallRecordingStateChanged", params)
+                    }
+                } catch (e: Exception) {
+                    // Ignored if catalyst instance is transitioning
+                }
             }
         }
     }
 
-    init {
-        val filter = IntentFilter("com.voicevault.app.CALL_RECORDING_EVENT")
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            reactContext.registerReceiver(recordingReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            reactContext.registerReceiver(recordingReceiver, filter)
+    override fun initialize() {
+        super.initialize()
+        try {
+            val filter = IntentFilter("com.voicevault.app.CALL_RECORDING_EVENT")
+            androidx.core.content.ContextCompat.registerReceiver(
+                reactContext,
+                recordingReceiver,
+                filter,
+                androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED
+            )
+        } catch (e: Exception) {
+            // Safe fallback
         }
+    }
+
+    override fun invalidate() {
+        try {
+            reactContext.unregisterReceiver(recordingReceiver)
+        } catch (e: Exception) {
+            // Ignore
+        }
+        super.invalidate()
     }
 
     @ReactMethod

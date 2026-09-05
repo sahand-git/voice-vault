@@ -59,21 +59,21 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.1.0
-          name: "VoiceVault v1.1.0 (Auto WhatsApp Call Recorder)"
+          tag_name: v1.2.0
+          name: "VoiceVault v1.2.0 (Stabilized & Auto Call Recorder)"
           body: |
-            ## VoiceVault v1.1.0 for Android 🎙️📞☁️
+            ## VoiceVault v1.2.0 for Android 🎙️📞☁️
 
-            ### ✨ New Feature: Automatic WhatsApp Call Detection & Recording!
-            - **Auto WhatsApp Call Detection**: Listens for incoming and ongoing WhatsApp and VoIP calls using Android Accessibility Service.
-            - **Automatic Foreground Recording**: Automatically records conversations without needing to manually open the app first.
-            - **Google Drive Cloud Sync**: Automatically backs up WhatsApp call recordings to Google Drive.
+            ### ✨ What's Fixed in v1.2.0:
+            - **Disabled React Native New Architecture in Gradle**: Switched `newArchEnabled=false` in `gradle.properties` to ensure 100% native stability and compatibility with Android audio recording and native modules.
+            - **Native Crash Diagnostic Handler**: Integrated `CrashHandler` and `CrashReportActivity` so if an error ever occurs, it is captured and displayed clearly instead of closing the app.
+            - **Safe Foreground Service**: Fixed notification icon and microphone permission checks before initializing Android foreground recording.
 
             ### 📱 Direct Download Links for Your Phone:
-            - **[Download VoiceVault.apk (Recommended - Debug Signed)](https://github.com/sahand-git/voice-vault/releases/download/v1.1.0/VoiceVault-Debug.apk)**
-            - **[Download VoiceVault-Release.apk](https://github.com/sahand-git/voice-vault/releases/download/v1.1.0/VoiceVault-Release.apk)**
+            - **[Download VoiceVault.apk (Recommended - Debug Signed)](https://github.com/sahand-git/voice-vault/releases/download/v1.2.0/VoiceVault-Debug.apk)**
+            - **[Download VoiceVault-Release.apk](https://github.com/sahand-git/voice-vault/releases/download/v1.2.0/VoiceVault-Release.apk)**
 
-            ### ⚙️ How to Activate WhatsApp Auto-Recording after Installing:
+            ### ⚙️ How to Activate WhatsApp Auto-Recording:
             1. Install and open VoiceVault.
             2. Go to the **Backup / Settings** tab.
             3. Under **WhatsApp & Call Auto-Recorder**, tap **Turn ON** for:

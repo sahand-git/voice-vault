@@ -67,5 +67,12 @@
       </intent-filter>
     </service>
 
+    <!-- Native Crash Report Activity (runs in dedicated process) -->
+    <activity
+      android:name=".CrashReportActivity"
+      android:exported="false"
+      android:process=":crash"
+      android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
+
   </application>
 </manifest>

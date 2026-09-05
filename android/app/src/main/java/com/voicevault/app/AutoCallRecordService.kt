@@ -70,7 +70,20 @@ class AutoCallRecordService : Service() {
 
         when (action) {
             ACTION_START -> {
-                startForeground(NOTIFICATION_ID, buildNotification("Recording $caller..."))
+                try {
+                    val notif = buildNotification("Recording $caller...")
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        startForeground(
+                            NOTIFICATION_ID,
+                            notif,
+                            android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                        )
+                    } else {
+                        startForeground(NOTIFICATION_ID, notif)
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Foreground start failed: ${e.message}")
+                }
                 startAudioRecording(caller)
             }
             ACTION_STOP -> {
@@ -84,6 +97,18 @@ class AutoCallRecordService : Service() {
 
     private fun startAudioRecording(caller: String) {
         if (isRecording) return
+
+        val hasMic = androidx.core.content.ContextCompat.checkSelfPermission(
+            this,
+            android.Manifest.permission.RECORD_AUDIO
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+        if (!hasMic) {
+            Log.w(TAG, "Microphone permission not granted, cannot record call.")
+            stopSelf()
+            return
+        }
+
         try {
             val targetDir = File(filesDir, "voicevault_recordings")
             if (!targetDir.exists()) {
@@ -186,7 +211,7 @@ class AutoCallRecordService : Service() {
         return NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
             .setContentTitle("VoiceVault Call Recorder")
             .setContentText(text)
-            .setSmallIcon(android.R.drawable.ic_btn_speak_now)
+            .setSmallIcon(R.mipmap.ic_launcher)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
