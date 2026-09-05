@@ -1,20 +1,31 @@
-import { Audio } from 'expo-av';
+import {
+  setAudioModeAsync,
+  requestRecordingPermissionsAsync,
+  createAudioPlayer,
+  AudioModule,
+  RecordingPresets,
+} from 'expo-audio';
+import type { AudioPlayer, AudioRecorder } from 'expo-audio';
 import * as FileSystem from 'expo-file-system';
 import { ensureDirectoryExists } from './storageService';
 import { RecordingItem } from '../types';
 
-let currentRecording: Audio.Recording | null = null;
-let currentSound: Audio.Sound | null = null;
+let currentRecorder: AudioRecorder | null = null;
+let currentPlayer: AudioPlayer | null = null;
+let statusInterval: ReturnType<typeof setInterval> | null = null;
+let playerSubscription: { remove: () => void } | null = null;
+let recordingStartTime = 0;
+let recordedDurationMs = 0;
 
 // Configure audio mode for high performance recording & playback
 export async function configureAudioSession(): Promise<void> {
   try {
-    await Audio.setAudioModeAsync({
-      allowsRecordingIOS: true,
-      playsInSilentModeIOS: true,
-      staysActiveInBackground: true,
-      shouldDuckAndroid: true,
-      playThroughEarpieceAndroid: false,
+    await setAudioModeAsync({
+      playsInSilentMode: true,
+      shouldPlayInBackground: true,
+      allowsBackgroundRecording: true,
+      interruptionMode: 'duckOthers',
+      shouldRouteThroughEarpiece: false,
     });
   } catch (error) {
     console.warn('Could not set audio mode:', error);
@@ -24,7 +35,7 @@ export async function configureAudioSession(): Promise<void> {
 // Request microphone permission
 export async function requestMicrophonePermission(): Promise<boolean> {
   try {
-    const response = await Audio.requestPermissionsAsync();
+    const response = await requestRecordingPermissionsAsync();
     return response.granted;
   } catch (error) {
     console.error('Permission request failed:', error);
@@ -34,8 +45,8 @@ export async function requestMicrophonePermission(): Promise<boolean> {
 
 // Start audio recording
 export async function startRecording(
-  onStatusUpdate?: (status: Audio.RecordingStatus) => void
-): Promise<Audio.Recording> {
+  onStatusUpdate?: (status: { isRecording: boolean; durationMillis: number; metering?: number }) => void
+): Promise<AudioRecorder> {
   const hasPermission = await requestMicrophonePermission();
   if (!hasPermission) {
     throw new Error('Microphone permission is required to record audio.');
@@ -43,55 +54,85 @@ export async function startRecording(
 
   await configureAudioSession();
 
-  // If previous recording is dangling, unload it
-  if (currentRecording) {
+  // If previous recording is dangling, clean it up
+  if (currentRecorder) {
     try {
-      await currentRecording.stopAndUnloadAsync();
+      if (statusInterval) clearInterval(statusInterval);
+      await currentRecorder.stop();
     } catch {}
-    currentRecording = null;
+    currentRecorder = null;
   }
 
-  const recording = new Audio.Recording();
+  const recorder = new AudioModule.AudioRecorder(RecordingPresets.HIGH_QUALITY);
+  await recorder.prepareToRecordAsync();
+  recorder.record();
+  currentRecorder = recorder;
+  recordingStartTime = Date.now();
+  recordedDurationMs = 0;
+
   if (onStatusUpdate) {
-    recording.setOnRecordingStatusUpdate(onStatusUpdate);
-    recording.setProgressUpdateInterval(100);
+    if (statusInterval) clearInterval(statusInterval);
+    statusInterval = setInterval(() => {
+      if (currentRecorder && currentRecorder.isRecording) {
+        const currentTotal = recordedDurationMs + (Date.now() - recordingStartTime);
+        const st = currentRecorder.getStatus();
+        onStatusUpdate({
+          isRecording: true,
+          durationMillis: st?.durationMillis || currentTotal,
+          metering: st?.metering,
+        });
+      }
+    }, 100);
   }
 
-  await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-  await recording.startAsync();
-  currentRecording = recording;
-  return recording;
+  return recorder;
 }
 
 // Pause current recording
 export async function pauseRecording(): Promise<void> {
-  if (currentRecording) {
-    await currentRecording.pauseAsync();
+  if (currentRecorder && currentRecorder.isRecording) {
+    recordedDurationMs += Date.now() - recordingStartTime;
+    currentRecorder.pause();
   }
 }
 
 // Resume paused recording
 export async function resumeRecording(): Promise<void> {
-  if (currentRecording) {
-    await currentRecording.startAsync();
+  if (currentRecorder && !currentRecorder.isRecording) {
+    recordingStartTime = Date.now();
+    currentRecorder.record();
   }
 }
 
 // Stop recording and save to permanent app storage
 export async function stopRecording(customTitle?: string): Promise<RecordingItem> {
-  if (!currentRecording) {
+  if (statusInterval) {
+    clearInterval(statusInterval);
+    statusInterval = null;
+  }
+
+  if (!currentRecorder) {
     throw new Error('No active recording found.');
   }
 
-  const status = await currentRecording.getStatusAsync();
-  const durationMs = status.durationMillis || 0;
+  const finalDuration = recordedDurationMs + (currentRecorder.isRecording ? (Date.now() - recordingStartTime) : 0);
+  const recorder = currentRecorder;
+  currentRecorder = null;
 
-  await currentRecording.stopAndUnloadAsync();
-  const tempUri = currentRecording.getURI();
-  currentRecording = null;
+  await recorder.stop();
+  let tempUri = recorder.uri;
+  if (!tempUri) {
+    const st = recorder.getStatus();
+    tempUri = st?.url || null;
+  }
 
   if (!tempUri) {
-    throw new Error('Failed to retrieve recording URI.');
+    throw new Error('Failed to retrieve recording file URI.');
+  }
+
+  // Normalize URI if file:// protocol is missing
+  if (!tempUri.startsWith('file://') && !tempUri.startsWith('content://')) {
+    tempUri = `file://${tempUri}`;
   }
 
   const targetDir = await ensureDirectoryExists();
@@ -120,7 +161,7 @@ export async function stopRecording(customTitle?: string): Promise<RecordingItem
     id: `rec_${timestamp}_${Math.random().toString(36).substring(2, 7)}`,
     title,
     uri: permanentUri,
-    durationMs,
+    durationMs: finalDuration > 0 ? finalDuration : 1000,
     sizeBytes,
     createdAt: timestamp,
     isSynced: false,
@@ -132,45 +173,64 @@ export async function stopRecording(customTitle?: string): Promise<RecordingItem
 // Audio Playback
 export async function playSound(
   uri: string,
-  onPlaybackStatusUpdate?: (status: any) => void
-): Promise<Audio.Sound> {
+  onPlaybackStatusUpdate?: (status: {
+    isLoaded: boolean;
+    isPlaying: boolean;
+    positionMillis: number;
+    durationMillis: number;
+    didJustFinish: boolean;
+  }) => void
+): Promise<AudioPlayer> {
   await stopSound();
   await configureAudioSession();
 
-  const { sound } = await Audio.Sound.createAsync(
-    { uri },
-    { shouldPlay: true, progressUpdateIntervalMillis: 100 },
-    onPlaybackStatusUpdate
-  );
+  const player = createAudioPlayer(uri, { updateInterval: 100 });
+  currentPlayer = player;
 
-  currentSound = sound;
-  return sound;
+  if (onPlaybackStatusUpdate) {
+    playerSubscription = player.addListener('playbackStatusUpdate', (status) => {
+      onPlaybackStatusUpdate({
+        isLoaded: status.isLoaded,
+        isPlaying: status.playing,
+        positionMillis: Math.round((status.currentTime || 0) * 1000),
+        durationMillis: Math.round((status.duration || 0) * 1000),
+        didJustFinish: Boolean(status.didJustFinish),
+      });
+    });
+  }
+
+  player.play();
+  return player;
 }
 
 export async function pauseSound(): Promise<void> {
-  if (currentSound) {
-    await currentSound.pauseAsync();
+  if (currentPlayer) {
+    currentPlayer.pause();
   }
 }
 
 export async function resumeSound(): Promise<void> {
-  if (currentSound) {
-    await currentSound.playAsync();
+  if (currentPlayer) {
+    currentPlayer.play();
   }
 }
 
 export async function seekSound(positionMillis: number): Promise<void> {
-  if (currentSound) {
-    await currentSound.setPositionAsync(positionMillis);
+  if (currentPlayer) {
+    await currentPlayer.seekTo(positionMillis / 1000);
   }
 }
 
 export async function stopSound(): Promise<void> {
-  if (currentSound) {
+  if (playerSubscription) {
+    playerSubscription.remove();
+    playerSubscription = null;
+  }
+  if (currentPlayer) {
     try {
-      await currentSound.stopAsync();
-      await currentSound.unloadAsync();
+      currentPlayer.pause();
+      currentPlayer.remove();
     } catch {}
-    currentSound = null;
+    currentPlayer = null;
   }
 }

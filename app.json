@@ -35,7 +35,7 @@
       "expo-sharing",
       "expo-web-browser",
       [
-        "expo-av",
+        "expo-audio",
         {
           "microphonePermission": "VoiceVault needs access to your microphone to record audio notes."
         }

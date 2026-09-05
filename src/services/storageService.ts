@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { RecordingItem, AppSettings, GoogleDriveUser } from '../types';
 
 const RECORDINGS_KEY = '@voicevault_recordings_v1';
